@@ -52,6 +52,7 @@ The repository is currently built and tested with the following toolchain:
 - **Dependency updates**: Scala upgraded from 2.12.11 to 2.12.20, sbt upgraded to 1.11.7, and the Z3 Java bindings jar (`lib/com.microsoft.z3.jar`) replaced with the one shipping with Z3 4.12.2.
 - **`.gitignore`**: the downloaded solver directories (`z3/`, `cvc5/`, `delphi/`) created by the `get-*.sh` setup scripts are now ignored.
 - **macOS**: copying the Z3 dylibs for SIP (`setup-z3-macos.sh`) is no longer needed when running tests through SBT; it is only required for the packaged binary run outside SBT.
+- **Running the packaged binary**: documented a no-root setup for the `sbt universal:packageBin` binary: `JAVA_OPTS="--enable-native-access=ALL-UNNAMED -Djava.library.path=.../z3/bin"` lets the launcher JVM load the bundled Z3 native libraries directly (bypassing SIP, which strips `DYLD_LIBRARY_PATH` from JVMs launched outside SBT) and silences the JDK 22+ native-access warning. Verified with all tutorial examples passing on OpenJDK 27.
 
 With these changes, all 672 tests pass on OpenJDK 27.
 
@@ -75,8 +76,8 @@ Note: when running the test suite through SBT, the build automatically configure
 
 ### Installation of prerequisites on Linux
 
-#### Java 11 
-- Install instructions for OpenJDK are available at https://openjdk.java.net/install/
+#### Java
+- Install instructions for OpenJDK (version 11 or newer) are available at https://openjdk.java.net/install/
 #### SBT (only required to build from source)
 - Install instructions for SBT are available at http://www.scala-sbt.org/1.0/docs/Setup.html
 #### External solvers
@@ -98,22 +99,9 @@ Alternatively, [Z3](https://github.com/Z3Prover/z3), [CVC5](https://github.com/c
 
 ### Installation of prerequisites on Mac
 
-#### Java 11
+#### Java
+- Install OpenJDK (version 11 or newer) with homebrew: `brew install openjdk` (further instructions are available at https://openjdk.org/install/).
 
-We recommend using openJDK 11 on MacOS, and provide instructions for installing this with homebrew (further instructions are available at https://openjdk.org/install/): 
-1. `brew install openjdk@11`
-
-If the above step does not work and you are running an old version of macOS, try:
-1. `brew update`
-2. `brew tap homebrew/cask-versions`
-3. `brew cask install java11`
-
-Make sure Java 11 is the default by adding the following lines to your dotfiles. For `bash` this is usually `.bash_profile` and for `zsh` this is usually `.zshrc`.
-```
-export JAVA_11_HOME=$(/usr/libexec/java_home -v11)
-alias java11='export JAVA_HOME=$JAVA_11_HOME'
-java11
-```
 ### SBT (only required to build from source)
 -  `brew install sbt`
 
@@ -129,15 +117,32 @@ java11
     export PATH=$PATH:/path/to/uclid/z3/bin:/path/to/uclid/cvc5/bin:/path/to/uclid/delphi/bin:/path/to/uclid/oracles
 ~~~
 - When building and testing through SBT, no further setup is required: `build.sbt` points the forked test JVM at `z3/bin/` for both the Z3 Java native libraries (`java.library.path` / `DYLD_LIBRARY_PATH`) and the solver executables, so the workaround below is **not** needed for `sbt test`.
-- Due to System Integrity Protection, introduced in OS X El Capitan, a JVM launched outside of SBT ignores the user set DYLD_LIBRARY_PATH. If you want to run the packaged UCLID5 binary (produced by `sbt universal:packageBin`), copy the JNI dynamic link library to Java/Library/Extensions and the non-JNI dynamic link libraries to /usr/local/lib as follows (if you build Z3 from source these files are found in the build directory), or simply run `./setup-z3-macos.sh`:
+- Due to System Integrity Protection, introduced in OS X El Capitan, a JVM launched outside of SBT ignores the user set DYLD_LIBRARY_PATH. Running the packaged UCLID5 binary therefore needs either the `JAVA_OPTS`-based setup or a one-time copy of the Z3 dylibs, both described in [Running the packaged binary](#running-the-packaged-binary).
+
+## Using the Pre-built binaries
+
+Get the [latest release](https://github.com/uclid-org/uclid/releases). The uclid binary is located in the bin/ subdirectory
+
+### Running the packaged binary
+
+The packaged binary launches its own JVM outside of SBT. This has two consequences that were fixed to make the binary run out of the box:
+
+1. On macOS, System Integrity Protection strips `DYLD_LIBRARY_PATH` from JVMs launched outside of SBT, so the JVM cannot find the Z3 native libraries. Fix (no root required): pass `-Djava.library.path` via `JAVA_OPTS`, which the launcher script forwards to the JVM, pointing it directly at the `z3/bin/` directory downloaded by `get-z3-*.sh`.
+2. On JDK 22 and newer, the restricted native call (`System.loadLibrary`) used by the Z3 Java bindings triggers warnings that will become an error in a future JDK release. Fix: add `--enable-native-access=ALL-UNNAMED` to `JAVA_OPTS`.
+
+Put together, run the binary as follows:
+
+    $ export JAVA_OPTS="--enable-native-access=ALL-UNNAMED -Djava.library.path=/path/to/uclid/z3/bin"
+    $ export PATH=$PATH:/path/to/uclid/uclid-0.9.5/bin:/path/to/uclid/z3/bin:/path/to/uclid/cvc5/bin:/path/to/uclid/delphi/bin:/path/to/uclid/oracles
+    $ uclid examples/tutorial/ex1.1-fib-model.ucl
+
+This exact setup is verified on OpenJDK 27 (macOS aarch64).
+
+Alternatively, copy the JNI dynamic link library to /Library/Java/Extensions and the non-JNI dynamic link library to /usr/local/lib (or simply run `./setup-z3-macos.sh` on macOS; if you build Z3 from source these files are found in the build directory):
 ~~~
     cp /path/to/uclid/z3/bin/libz3.dylib /usr/local/lib
     cp /path/to/uclid/z3/bin/libz3java.dylib /Library/Java/Extensions
 ~~~
-
-## Using the Pre-built binaries
-
-Get the [latest release](https://github.com/uclid-org/uclid/releases). The uclid binary is located in the bin/ subdirectory 
 
 ## Compiling uclid5 from source
 
@@ -151,11 +156,13 @@ Then run the following command in the root directory of the UCLID5 repository (n
 
     $ sbt universal:packageBin
 
-This will create uclid/target/universal/uclid-0.9.5.zip, which contains the uclid binary in the bin/ subdirectory. Unzip this file, and add it to your path. 
+This will create uclid/target/universal/uclid-0.9.5.zip, which contains the uclid binary in the bin/ subdirectory (with the updated Z3 4.12.2 Java bindings jar bundled into `lib/`). Unzip this file, and add it to your path.
 
-    $ unzip uclid-0.9.5.zip
+    $ unzip uclid-0.9.5.zip   # or run ./unpack.sh from the repository root
     $ cd uclid-0.9.5
     $ export PATH=$PATH:$PWD/bin
+
+To actually run the packaged binary, additionally apply the `JAVA_OPTS` and solver `PATH` setup described in [Running the packaged binary](#running-the-packaged-binary).
 
 
 ## Running UCLID
