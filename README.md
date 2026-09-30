@@ -34,21 +34,23 @@ A set of tutorial lectures on UCLID5 can be found [here](https://people.eecs.ber
 
 ## Versions
 
-Get the [latest release](https://github.com/uclid-org/uclid/releases), or get the latest development version `git clone https://github.com/uclid-ord/uclid`.
+Get the [latest release](https://github.com/uclid-org/uclid/releases), or get the latest development version `git clone https://github.com/uclid-org/uclid`.
 
 # Installation
 
 ## Prerequisites:
 To use the prebuilt binaries, UCLID5 requires:
 - [Z3 version 4.12.2](https://github.com/Z3Prover/z3/releases/tag/z3-4.12.1) with the Java bindings
-- [OpenJDK](https://openjdk.java.net/) version 8,9,10 or 11
+- [OpenJDK](https://openjdk.java.net/) version 11 or newer (the test suite is regularly run with OpenJDK 11 through 27)
 
 To compile from source, UCLID5 requires all of the above plus:
 - [SBT version 1.0 or greater.](https://www.scala-sbt.org/download.html)
 
-The following are optional requirements but several CI tests will fail without them:
-- (optional) [CVC5](https://github.com/cvc5/cvc5) version 0.0.4 is the SyGuS-IF compliant solver used for synthesis tests in the CI.
-- (optional) [Delphi](https://github.com/polgreen/delphi) is used for verification modulo oracles tests in the CI.
+The following are optional requirements but several tests will fail without them:
+- (optional) [CVC5](https://github.com/cvc5/cvc5) version 1.0.3 is the SyGuS-IF compliant solver used for the synthesis tests.
+- (optional) [Delphi](https://github.com/polgreen/delphi) is used for the verification modulo oracles tests.
+
+Note: when running the test suite through SBT, the build automatically configures the forked test JVM to load the Z3 native libraries from `z3/bin/` and to find `z3`, `cvc5_wait.sh`, `delphi`, and the bundled oracles on its `PATH`. In particular, the pinned Z3 4.12.2 in `z3/bin/` takes precedence over any other Z3 installation on your system, as newer Z3 versions produce slightly different counterexample output that some tests depend on.
 
 
 
@@ -107,7 +109,8 @@ java11
 ~~~
     export PATH=$PATH:/path/to/uclid/z3/bin:/path/to/uclid/cvc5/bin:/path/to/uclid/delphi/bin:/path/to/uclid/oracles
 ~~~
-- Due to System Integrity Protection, introduced in OS X El Capitan, Java ignores the user set DYLD_LIBRARY_PATH. Depending on the version of MacOS you are using, you may need to fix this issue by copying the JNI dynamic link libraries to Java/Library/Extensions and the non-JNI dynamic link libraries to /usr/local/lib as follows (if you build Z3 from source these files are found in the build directory):
+- When building and testing through SBT, no further setup is required: `build.sbt` points the forked test JVM at `z3/bin/` for both the Z3 Java native libraries (`java.library.path` / `DYLD_LIBRARY_PATH`) and the solver executables, so the workaround below is **not** needed for `sbt test`.
+- Due to System Integrity Protection, introduced in OS X El Capitan, a JVM launched outside of SBT ignores the user set DYLD_LIBRARY_PATH. If you want to run the packaged UCLID5 binary (produced by `sbt universal:packageBin`), copy the JNI dynamic link library to Java/Library/Extensions and the non-JNI dynamic link libraries to /usr/local/lib as follows (if you build Z3 from source these files are found in the build directory), or simply run `./setup-z3-macos.sh`:
 ~~~
     cp /path/to/uclid/z3/bin/libz3.dylib /usr/local/lib
     cp /path/to/uclid/z3/bin/libz3java.dylib /Library/Java/Extensions
@@ -119,11 +122,13 @@ Get the [latest release](https://github.com/uclid-org/uclid/releases). The uclid
 
 ## Compiling uclid5 from source
 
-Run the following command in the root directory of the UCLID5 repository (note that it is not necessary to run `sbt update` if you already have the correct dependencies installed as per https://github.com/uclid-org/uclid/blob/master/build.sbt. However, running it will do no harm.):
+First download the external solvers as described above (`source get-z3-macos.sh` on macOS or `source get-z3-linux.sh` on Linux, plus the optional CVC5 and Delphi scripts if you want the full test suite to pass).
+
+Then run the following command in the root directory of the UCLID5 repository (note that it is not necessary to run `sbt update` if you already have the correct dependencies installed as per https://github.com/uclid-org/uclid/blob/master/build.sbt. However, running it will do no harm.):
 
     $ sbt update clean compile "set fork:=true" test
 
-If compilation and tests pass (or if the only failing tests are due to CVC5 and Delphi not being found), you can build a universal package.
+`build.sbt` already enables forking for the test JVM and configures it to find the Z3 native libraries and solver executables, so plain `sbt test` works as well. If compilation and tests pass (or if the only failing tests are due to CVC5 and Delphi not being found), you can build a universal package.
 
     $ sbt universal:packageBin
 

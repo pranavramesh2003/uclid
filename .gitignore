@@ -29,4 +29,8 @@ tasks
 .z3_trace
 lib/libz3java.so
 /z3-*
+# downloaded solver binaries (see get-z3-*.sh, get-cvc5-*.sh, get-delphi-*.sh)
+/z3/
+/cvc5/
+/delphi/
 *.json
