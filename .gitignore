@@ -33,4 +33,6 @@ lib/libz3java.so
 /z3/
 /cvc5/
 /delphi/
+# unzipped universal package (sbt universal:packageBin output)
+/uclid-0.9.5/
 *.json

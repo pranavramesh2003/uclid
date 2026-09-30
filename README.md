@@ -36,15 +36,34 @@ A set of tutorial lectures on UCLID5 can be found [here](https://people.eecs.ber
 
 Get the [latest release](https://github.com/uclid-org/uclid/releases), or get the latest development version `git clone https://github.com/uclid-org/uclid`.
 
+### Current build environment
+
+The repository is currently built and tested with the following toolchain:
+- OpenJDK 27 (Homebrew, macOS aarch64)
+- sbt 1.11.7
+- Scala 2.12.20
+- Z3 4.12.2 (Java bindings jar in `lib/`, native binaries bundled in `z3/bin/`)
+- ScalaTest 3.2.2
+
+### Recent fixes (September 2026)
+
+- **Forked test JVM environment (`build.sbt`)**: `sbt test` now runs the test suite in a forked JVM that is automatically configured to load the bundled Z3 4.12.2 native libraries (`java.library.path` and `DYLD_LIBRARY_PATH` point at `z3/bin`) and to find `z3`, `cvc5_wait.sh`, `delphi`, and the bundled oracles on its `PATH`. The pinned Z3 4.12.2 in `z3/bin/` takes precedence over any system-wide Z3 installation, so no manual environment setup is required to run the tests.
+- **JDK 22+ support**: on JDK 22 and newer, the forked test JVM is launched with `--enable-native-access=ALL-UNNAMED`, since recent JDKs warn about (and will eventually block) restricted native calls such as `System.loadLibrary`. This makes OpenJDK 27 work out of the box.
+- **Dependency updates**: Scala upgraded from 2.12.11 to 2.12.20, sbt upgraded to 1.11.7, and the Z3 Java bindings jar (`lib/com.microsoft.z3.jar`) replaced with the one shipping with Z3 4.12.2.
+- **`.gitignore`**: the downloaded solver directories (`z3/`, `cvc5/`, `delphi/`) created by the `get-*.sh` setup scripts are now ignored.
+- **macOS**: copying the Z3 dylibs for SIP (`setup-z3-macos.sh`) is no longer needed when running tests through SBT; it is only required for the packaged binary run outside SBT.
+
+With these changes, all 672 tests pass on OpenJDK 27.
+
 # Installation
 
 ## Prerequisites:
 To use the prebuilt binaries, UCLID5 requires:
 - [Z3 version 4.12.2](https://github.com/Z3Prover/z3/releases/tag/z3-4.12.1) with the Java bindings
-- [OpenJDK](https://openjdk.java.net/) version 11 or newer (the test suite is regularly run with OpenJDK 11 through 27)
+- [OpenJDK](https://openjdk.java.net/) version 11 or newer (releases 11 through 27 are known to work; the current development and test environment uses OpenJDK 27)
 
 To compile from source, UCLID5 requires all of the above plus:
-- [SBT version 1.0 or greater.](https://www.scala-sbt.org/download.html)
+- [SBT version 1.0 or greater.](https://www.scala-sbt.org/download.html) (the current build uses sbt 1.11.7 and Scala 2.12.20)
 
 The following are optional requirements but several tests will fail without them:
 - (optional) [CVC5](https://github.com/cvc5/cvc5) version 1.0.3 is the SyGuS-IF compliant solver used for the synthesis tests.
